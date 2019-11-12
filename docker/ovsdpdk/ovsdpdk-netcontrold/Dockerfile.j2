@@ -1,0 +1,44 @@
+FROM {{ namespace }}/{{ image_prefix }}ovsdpdk:{{ tag }}
+LABEL maintainer="{{ maintainer }}" name="{{ image_name }}" build-date="{{ build_date }}"
+
+{% block netcontrold_header %}{% endblock %}
+
+{% import "macros.j2" as macros with context %}
+
+{% block netcontrold_install %}{% endblock %}
+
+{% if base_package_type == 'rpm' %}
+    {% set netcontrold_packages = [
+        'openvswitch',
+        'python3-pip',
+    ] %}
+{% elif base_package_type == 'deb' %}
+    {% set netcontrold_packages = [
+        'openvswitch-switch',
+        'python3-pip',
+    ] %}
+{% endif %}
+
+{{ macros.install_packages(netcontrold_packages | customizable("packages")) }}
+
+{% block netcontrold_source_install_python_pip %}
+{{ macros.get_pip() }}
+{% endblock %}
+
+{% set netcontrold_pip_packages = [
+    'netcontrold',
+  ]
+%}
+
+RUN {{ macros.install_pip(netcontrold_pip_packages | customizable("pip_packages"), constraints = false) }}
+
+{% if base_distro in ['centos', 'rhel', 'oraclelinux', 'ubuntu'] %}
+ENTRYPOINT ["sh", "-c", "/usr/bin/ncd_watch"]
+{% elif base_distro in ['debian'] %}
+ENTRYPOINT ["sh", "-c", "/usr/local/bin/ncd_watch"]
+{% endif %}
+
+COPY extend_start.sh /usr/local/bin/kolla_ovsdpdk_extend_start
+RUN chmod 755 /usr/local/bin/kolla_ovsdpdk_extend_start
+
+{% block netcontrold_footer %}{% endblock %}
